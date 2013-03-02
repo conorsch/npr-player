@@ -41,7 +41,17 @@ sub play { # play URL via mplayer (default), or whatever software user specified
 	my $software = $self->software;
 	my $url = $self->program->url;
 
-	system( "$software $url >/dev/null 2>&1" );
+	my $pid = fork();
+	$self->pid( $pid );
+	if ( $pid == 0 ) {
+		exec( "$software $url >/dev/null 2>&1" ) or die "Could not fork out to player $!";
+	}
+	elsif ( defined( $pid ) ) { 
+		return $pid;
+	}
+	else { 
+		die "Could not fork out to player $!";
+	}
 
 }
 

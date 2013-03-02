@@ -48,9 +48,7 @@ has 'date'         => ( is => 'ro', isa => 'Date', default => &today );
 
 sub BUILD {
     my $self = shift;
-	say "I AM BUILDING A PROGRAM";
     $self->url( $self->base_url . '/' . $self->short_title . '/' . $self->date . '_' . $self->short_title . '_' . $self->episode . '.mp3?dl=1' );
-	say "HELLO I AM A PROGRAM AND MY URL IS:\n\t" . $self->url;
 }
 
 sub today {    # return today's date formatted for interpolation in URL;

@@ -9,52 +9,166 @@ use Getopt::Long;                    # for parsing command-line options;
 use Moose;                           # for beautiful objects;
 use Moose::Util::TypeConstraints;    # for stronger attribute typing;
 use Regexp::Common;                  # for pre-baked regular expressions;
-use Regexp::Common qw(time);
-use POSIX;
+use Time::Piece;                     # for easy manipulation of time by day of week or time of day;
+use WWW::Mechanize;                  # for reading web pages programmatically;
+use Episode;
+use XML::Simple;
 
-my $base_uri = 'http://pd.npr.org/anon.npr-mp3/npr';    # declare first part of URL
+has 'description',
+  is  => 'rw',
+  isa => 'Str';
 
+has 'short_title',
+  is  => 'rw',
+  isa => 'Str';
 
-subtype 'Url' 
-	=> as 'Str' 
-	=> where { /^$RE{URI}{HTTP}$/ } 
-	=> message { "$_ is not a valid URL" }
-;
+has 'title',
+  is       => 'rw',
+  isa      => 'Str',
+  required => 1;
 
-subtype 'Date' 
-	=> as 'Str' 
-	=> where { /^$RE{time}{strftime}{-pat => '%Y\/%m\/%Y%m%d'}$/ } 
-	=> message { "$_ is not a valid date; must use %Y/%m/%Y%m%d format" }
-;
+has 'feed_url',
+  is  => 'rw',
+  isa => 'Str';
 
-subtype 'SupportedProgram' 
-	=> as 'Str' 
-#	=> where { map { $_->title } @supported_programs } 
-	=> message { "$_ is not a valid date; must use %Y/%m/%Y%m%d format" }
-;
-has 'url' => (
-    is  => 'rw',
-    isa => 'Url'
+has 'raw_xml',
+  is     => 'ro',
+  writer => 'set_raw_xml',
+  isa    => 'Str';
+
+has 'date',
+  is      => 'rw',
+  isa     => 'Str',
+  default => sub { my $t = localtime; return $t->ymd };
+
+has 'tagged_content',
+  is      => 'rw',
+  isa     => 'HashRef',
+  lazy    => 1,
+  builder => 'get_tagged_content';
+
+has 'articles',
+  is         => 'ro',
+  isa        => 'ArrayRef[Str]',
+  auto_deref => 1,
+  builder    => 'find_articles',
+  lazy       => 1;
+
+has 'episodes',
+  is         => 'ro',
+  isa        => 'ArrayRef',
+  auto_deref => 1,
+  builder    => 'find_episodes',
+  lazy       => 1;
+
+has 'verbose',
+is => 'rw',
+isa => 'Int',
+default => 0;
+
+has 'episode',
+  is      => 'rw',
+  isa     => 'Episode',
+  default => sub {
+    my $self     = shift;
+    my $episodes = $self->episodes;
+    my $episode  = @{ $episodes }[ rand( scalar @$episodes ) ];
+    return $episode;
+  };
+
+my @supported_programs = (
+    {
+        short_title => 'me',
+        title       => 'Morning Edition',
+        description =>
+"Morning Edition gives its audience news, analysis, commentary, and coverage of arts and sports. Stories are told through conversation as well as full reports. It's up-to-the-minute news that prepares listeners for the day ahead.",
+        feed_url => 'http://www.npr.org/rss/rss.php?id=3',
+    },
+    {
+        short_title => 'atc',
+        title       => 'All Things Considered',
+        description =>
+"Every weekday, All Things Considered hosts Robert Siegel, Michele Norris and Melissa Block present the program's trademark mix of news, interviews, commentaries, reviews, and offbeat features.",
+        feed_url => 'http://feeds.feedburner.com/NprProgramsATC'
+    },
+    {
+        short_title => 'wesat',
+        title       => 'Weekend Edition Saturday',
+        description =>
+"From civil wars in Bosnia and El Salvador, to hospital rooms, police stations, and America's backyards, National Public Radio's Peabody Award-winning correspondent Scott Simon brings a well-traveled perspective to his role as host of Weekend Edition Saturday.",
+        feed_url => 'http://www.npr.org/rss/rss.php?id=7',
+    },
+    {
+        short_title => 'wesun',
+        title       => 'Weekend Edition Sunday',
+        description =>
+"Weekend Edition Sunday premiered on Jan. 18, 1987. Since then, Weekend Edition Sunday has covered newsmakers and artists, scientists and politicans, music makers of all kinds, writers, thinkers, theologians and all manner of news events. Originally hosted by Susan Stamberg, the show was anchored by Liane Hansen for 22 years.",
+        feed_url => 'http://www.npr.org/rss/rss.php?id=10',
+    },
 );
 
-has 'episode'  => ( is => 'rw', isa => 'Str', default => '01' );
-has 'base_url' => ( is => 'ro', isa => 'Url', default => 'http://pd.npr.org/anon.npr-mp3/npr' );    # declare first part of URL
+around BUILDARGS => sub {
+    my ( $orig, $class, @args ) = @_;
 
-has 'description'  => ( is => 'ro', isa => 'Str' );
-has 'abbreviation' => ( is => 'ro', isa => 'Str' );
-has 'short_title'  => ( is => 'ro', isa => 'Str', default => 'me' );
-has 'title'        => ( is => 'ro', isa => 'Str' );
-has 'date'         => ( is => 'ro', isa => 'Date', default => &today );
+    my $real_args = {};    # initialize empty hash ref for storing valid arguments to construtor;
+    for my $arg ( @args ) {    # look at each arg received from caller;
+        for my $supported_program ( @supported_programs ) {    # look at each supported program;
+            if (   $supported_program->{ title } eq $arg
+                or $supported_program->{ short_title } eq $arg )
+            {
+                return $class->$orig( $supported_program );    # use this setup;
+            }
+        }
+    }
 
-sub BUILD {
+    return;                                                    # if we made it this far, return failure;
+
+};
+
+sub get_tagged_content {                                       # parse RSS feed into hash ref;
     my $self = shift;
-    $self->url( $self->base_url . '/' . $self->short_title . '/' . $self->date . '_' . $self->short_title . '_' . $self->episode . '.mp3?dl=1' );
+    my $mech = WWW::Mechanize->new( autocheck => 1 );
+    $mech->get( $self->feed_url );                             # retrieve raw XML from RSS feed;
+
+    $self->set_raw_xml( $mech->content );                      # store this XML for later in case it's needed;
+    my $tagged_content = XMLin( $self->raw_xml ) or return;    # return failure unless content parses;
+    return $tagged_content;                                    # pass back hashref to caller;
 }
 
-sub today {    # return today's date formatted for interpolation in URL;
-    return POSIX::strftime( "%Y/%m/%Y%m%d", localtime );
+sub find_episodes {                                            # build list of Episode objects for the current program;
+    my $self     = shift;
+    my $episodes = [];                                         # initialize empty array ref for storing episodes;
+
+    for my $item ( @{ $self->tagged_content->{ channel }->{ item } } ) {    # retrieve episode attributes from feed;
+        $item->{ pub_date } = delete $item->{ pubDate };                    # rename value for consistency;
+        push $episodes, $item;                                              # append this episode to our list;
+    }
+    $_ = Episode->new( $_ ) for @$episodes;                                 # construct Episode objects from args;
+    return $episodes;                                                       # pass back array reference to episode attributes;
 }
 
+sub recommended {                                                           # return the right Program to list to now;
+    my $class = shift;
+    my $now   = localtime;
 
+    if ( $now->hour < 8 ) {                                                 # if before 8:00AM;
+        $now -= 86400;                                                      # subtract one day, to get yesterday's datetime;
+    }
+
+    if ( $now->wday ~~ [ 2 .. 5 ] ) {                                       # if today is a weekday;
+		say "Tuning to Morning Edition...";
+        return $class->new( 'Morning Edition' );
+    }
+
+    elsif ( $now->wday == 7 ) {                                             # if today is Saturday;
+		say "Tuning to Weekend Edition Saturday...";
+        return $class->new( 'Weekend Edition Saturday' );
+    }
+    elsif ( $now->wday == 1 ) {                                             # if today is Sunday;
+		say "Tuning to Weekend Edition Sunday...";
+        return $class->new( 'Morning Edition Sunday' );
+    }
+}
 
 1;
+

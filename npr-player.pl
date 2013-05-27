@@ -2,13 +2,14 @@
 # quick script to play NPR podcasts;
 use strict;
 use warnings;
-use diagnostics;      # useful for debugging;
-use feature 'say';    # beats print;
-use Getopt::Long;     # for parsing command-line options;
-use Moose; # for beautiful objects;
+use diagnostics;               # useful for debugging;
+use feature qw/switch say/;    # beats print;
+use Getopt::Long;              # for parsing command-line options;
+use Moose;                     # for beautiful objects;
 use Player;
 use Program;
 use Data::Dumper;
+use Time::Piece;
 use threads;
 
 my $usage = <<'END';
@@ -32,13 +33,7 @@ Supported options:
 
 END
 
-my $player = Player->new( episode => '02');
-my $program = $player->program;
-
-
-say sprintf( "Now playing episode %s of %s, dated %s ...", 
-	$program->episode, $program->title, $program->date );
-say "BEFORE PLAYING";
+my $player  = Player->new;
 
 $player->play;
 waitpid( $player->pid, 0 );
@@ -49,29 +44,21 @@ $instance->join;
 say "AFTER PLAYING";
 sleep 5;
 $player->stop;
-#my $programs = $player->programs;
-#
-#say "Trying to display descriptions: ";
-#say Dumper( $programs );
-#say "REF TYPE IS: " . ref($programs);
-#say "DESCRIPTION IS: " . $_->description for @$programs;
+my $programs = $player->programs;
 
-
-#my $base_url = $program->base_url;
-#say "Trying to display base_url: '$base_url'";
-sub watch_input { 
-	while ( chomp( my $input = <STDIN> ) ) { 
-		my $pid = $player->pid or die "Could not look up PID for player $!";
-		if ( $input eq 'q' ) { 
-			say "Detected user input of 'q', killing player PID $pid...";
-			`kill $pid`;
-			exit;
-		}
-		else { 
-			say "I didn't understand the input '$input'";
-			next; 
-		}
-		`kill $pid` if $input eq 'n';
-	}
+sub watch_input {
+    while ( chomp( my $input = <STDIN> ) ) {
+        my $pid = $player->pid or die "Could not look up PID for player $!";
+        if ( $input eq 'q' ) {
+            say "Detected user input of 'q', killing player PID $pid...";
+            `kill $pid`;
+            exit;
+        }
+        else {
+            say "I didn't understand the input '$input'";
+            next;
+        }
+        `kill $pid` if $input eq 'n';
+    }
 }
 

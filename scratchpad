@@ -1,0 +1,38 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use feature 'say';
+use Time::Piece;
+use WWW::Mechanize;
+
+
+#use Player;
+#my $player = Player->new;
+#say "ARTICLES";
+#my @articles = $player->program->articles;
+#say @articles;
+#exit;
+#
+
+use Program;
+my $program = Program->new( title => 'Weekend Edition Sunday') ;
+say "Now fetching articles for: " . $program->title;
+say "The RSS feed for this program resides at: " . $program->feed_url;
+my @articles = $program->articles;
+say $_ for @articles;
+exit;
+
+
+
+
+
+my $start = 'http://www.npr.org/rss/rss.php?id=10';
+
+my $mech = WWW::Mechanize->new( autocheck => 1 );
+$mech->get( $start );    #
+my $timestamp = localtime->ymd( '/' );
+
+my $feed = $mech->content;
+
+# http://www.npr.org/2013/02/24/172803910/for-cubs-fans-a-little-hope-and-a-lot-of-patience?ft=1&f=10
+my @article_links = $mech->content =~ m#^.*<link>(.*\d{4}/\d{2}/\d{2}.*)\?.*</link>$#gm;

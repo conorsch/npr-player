@@ -43,6 +43,10 @@ has 'audio',
   lazy => 1;
   ;
 
+has 'of',
+  is => 'ro',
+  required => 1;
+
 subtype 'Url' => as 'Str' => where { /^$RE{URI}{HTTP}$/ } => message { "$_ is not a valid URL" };
 
 sub url_date {    # return date formatted for interpolation in URL;
@@ -55,6 +59,7 @@ sub url_date {    # return date formatted for interpolation in URL;
 
 sub get_audio_url {                              # return URL to MP3 file for audio playback;
     my $self = shift;
+    return $self->link if $self->of =~ m/^Wiretap/; # Wiretap has audio URLs directly in RSS feed;
     my $audio = HTML::TreeBuilder->new_from_url( $self->article )->look_down( class => 'download' )->{ href } or return;
     return $audio;
 }

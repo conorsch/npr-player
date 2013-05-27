@@ -22,7 +22,8 @@ and --episode in case you want to fine-tune your NPR listening.
 Requires mplayer.
 
 Usage: 
-	 --option 1		
+	 --program wesun    # plays most recent Weekend Edition Sunday		
+	 --program wiretap  # plays most recent Weekend Edition Sunday		
 	 --option 2	
 	 --help		# show this usage information
 
@@ -30,10 +31,28 @@ Supported options:
 
 	-h, --help 		# show this usage information
 	-v, --verbose		# enable chatty output
-
 END
+use Getopt::Long;    # for parsing command-line options;
 
-my $player  = Player->new;
+GetOptions(
+    'program|p'      => \my $program,
+    'help|h|?|usage' => \my $help,
+    'verbose|v'      => \my $verbose,
+) or die "$usage";
+
+say $usage and exit if $help;    # print help/usage info when asked;
+
+my @supported_programs = map {   # build a list of accepted arguments for program;
+    $_->{ title },               # check for full title of program;
+      $_->{ short_title },       # also accept abbreviations;
+} Program->supported_programs;
+
+if ( $program or @ARGV ) { # overload arg-reading to accept --program as ARGV[0];
+	$program = $ARGV[ 0 ] unless $program; # don't clobber a manually specified --program;
+	die "The program '$program' is not supported. Try one of the following:\n@supported_programs" unless grep { /^$program$/i } @supported_programs;
+}
+
+my $player = Player->new( { program => $program } );
 
 $player->play;
 waitpid( $player->pid, 0 );
@@ -41,8 +60,6 @@ my $instance = threads->create( \&watch_input );
 
 $instance->join;
 
-say "AFTER PLAYING";
-sleep 5;
 $player->stop;
 my $programs = $player->programs;
 

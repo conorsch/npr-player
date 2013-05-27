@@ -14,11 +14,7 @@ use threads;                         # for running mplayer as separate PID;
 
 has 'program',
   is       => 'rw',
-  isa      => 'Program',
-  lazy     => 1,
-  default  => sub { return Program->recommended; },
-  required => 1,
-  handles  => [ qw( articles recommended ) ];
+  handles => { now_playing => 'episode' };
 
 has 'pid' => ( is => 'rw', isa => 'Int' );
 has 'software' => ( is => 'rw', isa => 'Str', default => '/usr/bin/mplayer' );
@@ -27,26 +23,37 @@ is => 'rw',
 isa => 'Int',
 default => 1;
 
-sub now_playing { 
-	my $self = shift;
-	return $self->program->episode;
-}
+has 'startup', is => 'rw', isa => 'Int', default => 1, required => 1;
+
+around 'program' => sub { 
+	my $orig = shift;
+	my $class = shift;
+	# build as requested, or make a recommendation;
+	return $class->$orig ? Program->new( $class->$orig) : Program->recommended;
+};
+
 
 after 'play' => sub {
 	my $self = shift;
 	my $episode = $self->now_playing;
+
 	if ( $self->verbose ) {
-		say "Now playing: '" , $episode->title, "'";
+		say "Tuning to ", $self->program->title, "..." if $self->startup;
+		say 'Now playing: "', $episode->title, '"';
 		say "Published on: ", $episode->pub_date;
+		say ""; # padding for readability;
 
 	}
+
+	$self->startup( 0 );
 };
 
 sub play {    # play URL via mplayer (default), or whatever software user specified;
     my $self = shift;
 
     my $software = $self->software;
-    my $url      = $self->program->episode->url;
+    my $episode      = $self->now_playing;
+	my $url = $episode->url;
 
     my $pid = fork();
     $self->pid( $pid );

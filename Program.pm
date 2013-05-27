@@ -113,8 +113,8 @@ around BUILDARGS => sub {
     my $real_args = {};    # initialize empty hash ref for storing valid arguments to construtor;
     for my $arg ( @args ) {    # look at each arg received from caller;
         for my $supported_program ( $class->supported_programs ) {    # look at each supported program;
-            if (   $supported_program->{ title } eq $arg
-                or $supported_program->{ short_title } eq $arg )
+            if (   $supported_program->{ title } =~ m/$arg/i
+                or $supported_program->{ short_title } =~ m/$arg/i )
 
             {
                 return $class->$orig( $supported_program );           # use this setup;

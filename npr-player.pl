@@ -17,15 +17,19 @@ npr-player
 
 Plays NPR podcasts via mplayer. Default settings will play 
 today's Morning Edition, but it understands flags like --program 
-and --episode in case you want to fine-tune your NPR listening.
+and --episode in case you want to fine-tune your NPR listening. 
+
+Matching by program name is done via a loose substring search, so 
+command line use has sane defaults.
 
 Requires mplayer.
 
 Usage: 
-	 --program wesun    # plays most recent Weekend Edition Sunday		
-	 --program wiretap  # plays most recent Weekend Edition Sunday		
-	 --option 2	
-	 --help		# show this usage information
+
+	npr					# plays most recent program published
+	npr Wiretap			# plays a recent episode of Wiretap
+	npr wesun			# plays most recent Weekend Edition Sunday
+	npr sat				# plays most recent Weekend Edition Saturday
 
 Supported options:
 
@@ -47,9 +51,14 @@ my @supported_programs = map {   # build a list of accepted arguments for progra
       $_->{ short_title },       # also accept abbreviations;
 } Program->supported_programs;
 
-if ( $program or @ARGV ) { # overload arg-reading to accept --program as ARGV[0];
-	$program = $ARGV[ 0 ] unless $program; # don't clobber a manually specified --program;
-	die "The program '$program' is not supported. Try one of the following:\n@supported_programs" unless grep { /^$program$/i } @supported_programs;
+if ( $program or @ARGV ) {       # overload arg-reading to accept --program as ARGV[0];
+    $program = $ARGV[ 0 ] unless $program;    # don't clobber a manually specified --program;
+
+    unless ( grep { /$program/i } @supported_programs ) { # make sure we understand this request;
+        say "$usage\nThe program '$program' is not supported. Try one of the following:\n";
+		say "\t- $_" for sort @supported_programs;
+        exit 1;
+    }
 }
 
 my $player = Player->new( { program => $program } );

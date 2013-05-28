@@ -3,16 +3,12 @@ use strict;
 use warnings;
 use diagnostics;                     # useful for debugging;
 use feature 'say';                   # beats print;
-use Getopt::Long;                    # for parsing command-line options;
 use Moose;                           # for beautiful objects;
 use Moose::Util::TypeConstraints;    # for stronger attribute typing;
 use MooseX::Aliases;                 # for dev-friendly overloading of method names (via aliases);
 use Regexp::Common;                  # for pre-baked regular expressions;
 use Time::Piece;                     # for easy manipulation of time by day of week or time of day;
-use WWW::Mechanize;                  # for reading in web pages;
-use XML::Simple;                     # for parsing XML data on article pages (to extract MP3 URLs);
 use HTML::TreeBuilder;
-use Data::Dumper;
 
 has 'title',
   is       => 'ro',
@@ -29,10 +25,14 @@ has 'pub_date',
   isa => 'Str',
   required => 1;
 
+has 'guid',
+  is  => 'ro',
+  isa => 'Str';
+
 has 'link',
   is    => 'ro',
   isa   => 'Str',
-  alias => [ qw/ article url article_url / ],
+  alias => [ qw/ article article_url / ],
   required => 1;
 
 has 'audio',
@@ -59,7 +59,7 @@ sub url_date {    # return date formatted for interpolation in URL;
 
 sub get_audio_url {                              # return URL to MP3 file for audio playback;
     my $self = shift;
-    return $self->link if $self->of =~ m/^Wiretap/; # Wiretap has audio URLs directly in RSS feed;
+    return $self->guid if $self->of =~ m/^Wiretap/; # Wiretap has audio URLs directly in RSS feed;
     my $audio = HTML::TreeBuilder->new_from_url( $self->article )->look_down( class => 'download' )->{ href } or return;
     return $audio;
 }

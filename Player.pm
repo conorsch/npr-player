@@ -5,7 +5,6 @@ use strict;
 use warnings;
 use diagnostics;                     # useful for debugging;
 use feature 'say';                   # beats print;
-use Getopt::Long;                    # for parsing command-line options;
 use Moose;                           # for beautiful objects;
 use Moose::Util::TypeConstraints;    # for stronger attribute typing;
 use Regexp::Common;                  # for pre-baked regular expressions;

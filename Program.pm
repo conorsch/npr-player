@@ -13,7 +13,6 @@ use Time::Piece;                     # for easy manipulation of time by day of w
 use WWW::Mechanize;                  # for reading web pages programmatically;
 use Episode;
 use XML::Simple;
-use Data::Dumper;
 
 has 'description',
   is  => 'rw',

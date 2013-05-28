@@ -1,0 +1,23 @@
+Use the 'npr-standalone' bundle, made executable. No libs necessary.
+
+Plays NPR podcasts via mplayer. Default settings will play the 
+appropriate program according to time of day. You can override 
+this decision by providing a program name or abbreviation. 
+Matching by program name is done via a loose substring search, so 
+command-line use has sane defaults.
+
+Requires mplayer.
+
+Usage: 
+
+	npr				# plays most recent program published
+	npr wiretap			# plays a recent episode of Wiretap
+	npr wesun			# plays most recent Weekend Edition Sunday
+	npr sat				# plays most recent Weekend Edition Saturday
+
+Supported options:
+
+	-l, --list			# list out all supported programs (and aliases)
+	-h, --help			# show this usage information
+	-v, --verbose			# enable chatty output
+
